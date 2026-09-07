@@ -1,0 +1,384 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - {{ name }}'s Custom Fitness Plan{% endblock %}
+
+{% block content %}
+<!-- Dashboard Header -->
+<div class="dashboard-header">
+    <div class="dashboard-title">
+        <span class="badge badge-green" style="margin-bottom: 0.5rem;">
+            <i class="fa-solid fa-check-circle"></i> Plan Generated Successfully
+        </span>
+        <h1>Welcome, <span class="gradient-text">{{ name }}</span>! 💪</h1>
+        <p>Here is your personalized metabolic profile, workout routine, and grocery strategy.</p>
+    </div>
+    <div class="dashboard-actions">
+        <a href="{{ url_for('history') }}" class="btn btn-secondary">
+            <i class="fa-solid fa-clock-rotate-left"></i> View History
+        </a>
+        <a href="{{ url_for('profile') }}" class="btn btn-secondary">
+            <i class="fa-solid fa-arrow-rotate-left"></i> Recalculate
+        </a>
+        <button onclick="window.print()" class="btn btn-outline">
+            <i class="fa-solid fa-print"></i> Print Plan
+        </button>
+    </div>
+</div>
+
+<!-- Profile Snapshot Row -->
+<div class="user-snapshot">
+    <div class="snapshot-item">
+        <i class="fa-solid fa-bullseye"></i>
+        <span>Goal: <strong>{{ goal }}</strong></span>
+    </div>
+    <div class="snapshot-item">
+        <i class="fa-solid fa-utensils"></i>
+        <span>Diet: <strong>{{ dietary_preference }}</strong></span>
+    </div>
+    {% if allergies and allergies != 'None' %}
+    <div class="snapshot-item">
+        <i class="fa-solid fa-shield-halved"></i>
+        <span>Allergies: <strong style="color: var(--accent-amber);">{{ allergies }}</strong></span>
+    </div>
+    {% endif %}
+    <div class="snapshot-item">
+        <i class="fa-solid fa-clock"></i>
+        <span>Schedule: <strong>{{ meal_schedule }}</strong></span>
+    </div>
+    <div class="snapshot-item">
+        <i class="fa-solid fa-weight-scale"></i>
+        <span>Weight: <strong>{{ weight }} kg</strong> &rarr; Target: <strong>{{ target_weight }} kg</strong></span>
+    </div>
+    <div class="snapshot-item">
+        <i class="fa-solid fa-heart-pulse"></i>
+        <span>BMI: <strong>{{ bmi }}</strong> <span class="badge badge-cyan" style="font-size: 0.7rem; padding: 0.15rem 0.5rem;">{{ bmi_category }}</span></span>
+    </div>
+</div>
+
+<!-- Primary Calories & Energy Grid -->
+<div class="metrics-grid">
+    <!-- Daily Target Calories -->
+    <div class="metric-card metric-card-primary">
+        <div class="metric-header">
+            <span>Daily Calorie Target</span>
+            <i class="fa-solid fa-crosshairs"></i>
+        </div>
+        <div class="metric-value">
+            {{ "%.0f"|format(calories) }}<span class="metric-unit">kcal / day</span>
+        </div>
+        <div class="metric-desc">
+            Calibrated specifically for your <strong>{{ goal }}</strong> objective
+        </div>
+    </div>
+
+    <!-- Maintenance TDEE -->
+    <div class="metric-card">
+        <div class="metric-header">
+            <span>Maintenance (TDEE)</span>
+            <i class="fa-solid fa-bolt" style="color: var(--accent-amber);"></i>
+        </div>
+        <div class="metric-value">
+            {{ "%.0f"|format(tdee) }}<span class="metric-unit">kcal</span>
+        </div>
+        <div class="metric-desc">
+            Total daily energy expenditure based on <strong>{{ activity_level }}</strong> activity
+        </div>
+    </div>
+
+    <!-- Basal Metabolic Rate (BMR) -->
+    <div class="metric-card">
+        <div class="metric-header">
+            <span>Basal Metabolic Rate</span>
+            <i class="fa-solid fa-fire" style="color: var(--accent-cyan);"></i>
+        </div>
+        <div class="metric-value">
+            {{ "%.0f"|format(bmr) }}<span class="metric-unit">kcal</span>
+        </div>
+        <div class="metric-desc">
+            Baseline calories burned at complete rest per 24 hours
+        </div>
+    </div>
+</div>
+
+<!-- Daily Macronutrients -->
+<h2 class="section-title">
+    <i class="fa-solid fa-chart-pie" style="color: var(--primary);"></i>
+    Target Daily Macronutrients
+</h2>
+
+<div class="macros-grid">
+    <!-- Protein Card -->
+    <div class="macro-card macro-protein">
+        <div class="macro-header">
+            <span class="macro-name"><i class="fa-solid fa-drumstick-bite"></i> Protein</span>
+            <span class="macro-amount">{{ "%.0f"|format(protein) }}g</span>
+        </div>
+        <div class="macro-bar-bg">
+            <div class="macro-bar-fill" style="width: {{ protein_pct }}%;"></div>
+        </div>
+        <div class="macro-cal-note">
+            {{ "%.0f"|format(protein * 4) }} kcal ({{ protein_pct }}% of daily target)
+        </div>
+    </div>
+
+    <!-- Carbohydrates Card -->
+    <div class="macro-card macro-carbs">
+        <div class="macro-header">
+            <span class="macro-name"><i class="fa-solid fa-wheat-awn"></i> Carbohydrates</span>
+            <span class="macro-amount">{{ "%.0f"|format(carbs) }}g</span>
+        </div>
+        <div class="macro-bar-bg">
+            <div class="macro-bar-fill" style="width: {{ carbs_pct }}%;"></div>
+        </div>
+        <div class="macro-cal-note">
+            {{ "%.0f"|format(carbs * 4) }} kcal ({{ carbs_pct }}% of daily target)
+        </div>
+    </div>
+
+    <!-- Healthy Fats Card -->
+    <div class="macro-card macro-fats">
+        <div class="macro-header">
+            <span class="macro-name"><i class="fa-solid fa-bottle-droplet"></i> Healthy Fats</span>
+            <span class="macro-amount">{{ "%.0f"|format(fat) }}g</span>
+        </div>
+        <div class="macro-bar-bg">
+            <div class="macro-bar-fill" style="width: {{ fat_pct }}%;"></div>
+        </div>
+        <div class="macro-cal-note">
+            {{ "%.0f"|format(fat * 9) }} kcal ({{ fat_pct }}% of daily target)
+        </div>
+    </div>
+</div>
+
+<!-- Interactive Water Hydration Tracker Widget -->
+<div class="water-tracker-card" id="waterTracker" data-target="{{ water_liters }}" data-user="{{ name }}">
+    <div class="water-tracker-header">
+        <div class="water-tracker-title">
+            <i class="fa-solid fa-droplet"></i>
+            <span>Interactive Water Tracker</span>
+        </div>
+        <span class="badge badge-cyan">
+            <i class="fa-solid fa-bullseye"></i> Goal: {{ water_liters }} Liters / Day
+        </span>
+    </div>
+
+    <div class="water-tracker-body">
+        <div class="water-status-info">
+            <div class="water-amount-display">
+                <span class="water-current-liters" id="currentWaterLiters">0.0</span>
+                <span class="water-target-liters">/ {{ water_liters }} L (<span id="waterPercent">0</span>%)</span>
+            </div>
+            <div class="water-progress-bar">
+                <div class="water-progress-fill" id="waterProgressFill"></div>
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                Click below every time you drink water to record progress towards your cellular hydration goal.
+            </p>
+        </div>
+
+        <div class="water-actions">
+            <button type="button" class="water-btn" onclick="addWater(0.25)">
+                <i class="fa-solid fa-glass-water"></i> +250 ml (Glass)
+            </button>
+            <button type="button" class="water-btn" onclick="addWater(0.5)">
+                <i class="fa-solid fa-bottle-water"></i> +500 ml (Bottle)
+            </button>
+            <button type="button" class="water-btn water-btn-reset" onclick="resetWater()">
+                <i class="fa-solid fa-rotate-left"></i> Reset
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Plan Section Tabs -->
+<div class="tabs-nav">
+    <button class="tab-btn active" onclick="switchTab(event, 'tab-meals')">
+        <i class="fa-solid fa-utensils"></i> Meal Schedule
+    </button>
+    <button class="tab-btn" onclick="switchTab(event, 'tab-workout')">
+        <i class="fa-solid fa-dumbbell"></i> Workout Routine
+    </button>
+    <button class="tab-btn" onclick="switchTab(event, 'tab-grocery')">
+        <i class="fa-solid fa-cart-shopping"></i> Grocery Checklist
+    </button>
+</div>
+
+<!-- TAB 1: Diet Meals -->
+<div id="tab-meals" class="tab-pane active">
+    <h2 class="section-title">
+        <i class="fa-solid fa-calendar-day" style="color: var(--accent-green);"></i>
+        Customized {{ dietary_preference }} Meal Plan ({{ goal }})
+    </h2>
+    <div class="meal-cards-container">
+        {% for meal in diet_meals %}
+        <div class="meal-card">
+            <div class="meal-badge">
+                <i class="fa-solid fa-clock"></i> {{ meal.timing }}
+            </div>
+            <div class="meal-title">
+                <i class="{{ meal.icon }}"></i> {{ meal.title }}
+            </div>
+            <div class="meal-food-text">
+                <i class="fa-solid fa-utensils" style="color: var(--primary); margin-right: 0.4rem; font-size: 0.85rem;"></i>
+                {{ meal.food if meal.food is defined else meal['items'] }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- TAB 2: Workout Routine -->
+<div id="tab-workout" class="tab-pane">
+    <h2 class="section-title">
+        <i class="fa-solid fa-fire" style="color: var(--primary);"></i>
+        Weekly Training Routine ({{ goal }})
+    </h2>
+    <div class="workout-split-container">
+        {% for day in workout_routine %}
+        <div class="workout-day-card">
+            <div class="workout-day-header">
+                <div class="workout-day-title">
+                    <i class="fa-solid fa-calendar-check" style="color: var(--primary);"></i>
+                    {{ day.day }}: {{ day.name }}
+                </div>
+                <span class="workout-focus-badge">
+                    <i class="fa-solid fa-bullseye"></i> {{ day.focus }}
+                </span>
+            </div>
+            <div class="exercise-list">
+                {% for ex in day.exercises %}
+                <div class="exercise-item">
+                    <div class="exercise-name">
+                        <i class="fa-solid fa-angle-right" style="color: var(--primary); font-size: 0.85rem;"></i>
+                        {{ ex.name }}
+                    </div>
+                    <div class="exercise-meta">
+                        <span class="pill-sets"><i class="fa-solid fa-repeat"></i> {{ ex.sets }}</span>
+                        <span class="pill-rest"><i class="fa-solid fa-stopwatch"></i> {{ ex.rest }} rest</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- TAB 3: Grocery Shopping List -->
+<div id="tab-grocery" class="tab-pane">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
+        <h2 class="section-title" style="margin-bottom: 0;">
+            <i class="fa-solid fa-basket-shopping" style="color: var(--accent-cyan);"></i>
+            Weekly {{ dietary_preference }} Grocery Shopping Checklist
+        </h2>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="clearGroceryCheckboxes()">
+            <i class="fa-solid fa-square-check"></i> Reset Checked Items
+        </button>
+    </div>
+
+    <div class="grocery-grid">
+        {% for category in grocery_list %}
+        <div class="grocery-category-card">
+            <div class="grocery-category-title">
+                <i class="{{ category.icon }}" style="color: var(--primary);"></i>
+                {{ category.category }}
+            </div>
+            <ul class="checklist">
+                {% for item in category.food_items %}
+                <li class="checklist-item" onclick="toggleCheckbox(this)">
+                    <input type="checkbox" onchange="updateItemStyle(this)">
+                    <span>{{ item }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="dashboard-actions" style="margin-bottom: 2rem;">
+    <a href="{{ url_for('profile') }}" class="btn btn-primary">
+        <i class="fa-solid fa-user-plus"></i> Create Another Profile
+    </a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Tab Switcher
+    function switchTab(evt, tabId) {
+        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        
+        document.getElementById(tabId).classList.add('active');
+        evt.currentTarget.classList.add('active');
+    }
+
+    // Interactive Water Tracker
+    const waterTrackerEl = document.getElementById('waterTracker');
+    const userKey = 'fitlift_water_' + (waterTrackerEl ? waterTrackerEl.dataset.user : 'guest');
+    const targetLiters = parseFloat(waterTrackerEl ? waterTrackerEl.dataset.target : 3.0);
+
+    function getSavedWater() {
+        const saved = localStorage.getItem(userKey);
+        return saved ? parseFloat(saved) : 0.0;
+    }
+
+    function renderWater() {
+        const current = getSavedWater();
+        const displayEl = document.getElementById('currentWaterLiters');
+        const percentEl = document.getElementById('waterPercent');
+        const fillEl = document.getElementById('waterProgressFill');
+        
+        if (displayEl) displayEl.innerText = current.toFixed(2);
+        
+        const pct = Math.min(100, Math.round((current / targetLiters) * 100));
+        if (percentEl) percentEl.innerText = pct;
+        if (fillEl) fillEl.style.width = pct + '%';
+    }
+
+    function addWater(amount) {
+        let current = getSavedWater();
+        current = Math.round((current + amount) * 100) / 100;
+        localStorage.setItem(userKey, current);
+        renderWater();
+    }
+
+    function resetWater() {
+        if (confirm('Reset today\'s logged water to 0?')) {
+            localStorage.setItem(userKey, 0);
+            renderWater();
+        }
+    }
+
+    // Grocery Checklist interaction
+    function toggleCheckbox(liElement) {
+        const cb = liElement.querySelector('input[type="checkbox"]');
+        if (event.target !== cb) {
+            cb.checked = !cb.checked;
+        }
+        updateItemStyle(cb);
+    }
+
+    function updateItemStyle(checkbox) {
+        const parent = checkbox.closest('.checklist-item');
+        if (checkbox.checked) {
+            parent.classList.add('checked');
+        } else {
+            parent.classList.remove('checked');
+        }
+    }
+
+    function clearGroceryCheckboxes() {
+        document.querySelectorAll('.checklist-item input[type="checkbox"]').forEach(cb => {
+            cb.checked = false;
+            cb.closest('.checklist-item').classList.remove('checked');
+        });
+    }
+
+    // Initialize on load
+    document.addEventListener('DOMContentLoaded', () => {
+        renderWater();
+    });
+</script>
+{% endblock %}

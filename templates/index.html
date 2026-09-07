@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}FitLift - Transform Your Fitness & Nutrition{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <div class="hero-badge">
+        <span class="badge badge-primary">
+            <i class="fa-solid fa-bolt"></i> All-In-One Fitness & Nutrition Engine
+        </span>
+    </div>
+
+    <h1 class="hero-title">
+        Fuel Your Goals With <br>
+        <span class="gradient-text">Precision Science</span>
+    </h1>
+
+    <p class="hero-subtitle">
+        Calculate your exact metabolic rate, macro split, structured meal timing, goal-based workout routine, and weekly grocery checklist in seconds.
+    </p>
+
+    <div class="hero-actions">
+        <a href="{{ url_for('profile') }}" class="btn btn-primary">
+            <i class="fa-solid fa-calculator"></i> Build My Plan Now
+        </a>
+        <a href="{{ url_for('history') }}" class="btn btn-secondary">
+            <i class="fa-solid fa-clock-rotate-left"></i> View Past Profiles
+        </a>
+    </div>
+</div>
+
+<div id="features" class="features-grid">
+    <div class="feature-card">
+        <div class="feature-icon-box feature-icon-orange">
+            <i class="fa-solid fa-fire-flame-curved"></i>
+        </div>
+        <h3>BMR & TDEE Precision</h3>
+        <p>
+            Scientifically calculated Basal Metabolic Rate and Total Daily Energy Expenditure calibrated for your body metrics and daily activity level.
+        </p>
+    </div>
+
+    <div class="feature-card">
+        <div class="feature-icon-box feature-icon-cyan">
+            <i class="fa-solid fa-chart-pie"></i>
+        </div>
+        <h3>Targeted Macronutrients</h3>
+        <p>
+            Custom high-protein, carb, and healthy fat splits designed to maximize recovery, preserve lean muscle, and drive fat loss.
+        </p>
+    </div>
+
+    <div class="feature-card">
+        <div class="feature-icon-box feature-icon-purple">
+            <i class="fa-solid fa-dumbbell"></i>
+        </div>
+        <h3>Weekly Workout Splits</h3>
+        <p>
+            Goal-specific training routines with exercises, sets, reps, and rest timers for Muscle Gain, Fat Burn, Strength, or Maintenance.
+        </p>
+    </div>
+
+    <div class="feature-card">
+        <div class="feature-icon-box feature-icon-green">
+            <i class="fa-solid fa-basket-shopping"></i>
+        </div>
+        <h3>Meal Plan & Grocery List</h3>
+        <p>
+            Timed daily meals paired with a checkable weekly shopping list and an interactive daily water hydration tracker.
+        </p>
+    </div>
+</div>
+{% endblock %}

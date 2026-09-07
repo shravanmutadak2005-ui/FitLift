@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Fitness History & Profiles - FitLift{% endblock %}
+
+{% block content %}
+<div class="history-container">
+    <div class="dashboard-header" style="border: none; margin-bottom: 1rem; padding-bottom: 0;">
+        <div class="dashboard-title">
+            <span class="badge badge-cyan" style="margin-bottom: 0.5rem;">
+                <i class="fa-solid fa-clock-rotate-left"></i> Progress History
+            </span>
+            <h1>Saved Fitness <span class="gradient-text">Profiles</span></h1>
+            <p>Review past body assessments, target goals, and regenerated plans.</p>
+        </div>
+        <a href="{{ url_for('profile') }}" class="btn btn-primary">
+            <i class="fa-solid fa-plus"></i> New Assessment
+        </a>
+    </div>
+
+    {% if users and users|length > 0 %}
+    <div class="history-grid">
+        {% for u in users %}
+        <div class="history-card">
+            <div>
+                <div class="history-card-header">
+                    <div class="history-user-name">
+                        <i class="fa-solid fa-user-check" style="color: var(--primary); font-size: 1rem; margin-right: 0.3rem;"></i>
+                        {{ u.name }}
+                    </div>
+                    <span class="history-date">
+                        {% if u.created_at %}
+                            {{ u.created_at[:10] }}
+                        {% else %}
+                            Saved
+                        {% endif %}
+                    </span>
+                </div>
+
+                <div style="margin-bottom: 0.85rem; display: flex; gap: 0.4rem; flex-wrap: wrap;">
+                    <span class="badge badge-primary">
+                        <i class="fa-solid fa-bullseye"></i> {{ u.goal }}
+                    </span>
+                    <span class="badge badge-cyan">
+                        <i class="fa-solid fa-utensils"></i> {{ u.dietary_preference }}
+                    </span>
+                </div>
+
+                <div class="history-stats">
+                    <div class="history-stats-item">
+                        Gender: <strong>{{ u.gender }}</strong>
+                    </div>
+                    <div class="history-stats-item">
+                        Age: <strong>{{ u.age }} yrs</strong>
+                    </div>
+                    <div class="history-stats-item">
+                        Height: <strong>{{ u.height }} cm</strong>
+                    </div>
+                    <div class="history-stats-item">
+                        Weight: <strong>{{ u.weight }} kg</strong>
+                    </div>
+                    <div class="history-stats-item">
+                        Target: <strong>{{ u.target_weight }} kg</strong>
+                    </div>
+                    <div class="history-stats-item">
+                        Activity: <strong>{{ u.activity_level }}</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                <a href="{{ url_for('view_dashboard', user_id=u.id) }}" class="btn btn-secondary btn-sm" style="width: 100%;">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Open Full Dashboard
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card" style="text-align: center; padding: 3.5rem 1.5rem;">
+        <i class="fa-solid fa-clipboard-question" style="font-size: 3rem; color: var(--text-muted); margin-bottom: 1rem;"></i>
+        <h2 style="font-family: var(--font-heading); margin-bottom: 0.5rem;">No Profiles Saved Yet</h2>
+        <p style="color: var(--text-secondary); max-width: 450px; margin: 0 auto 1.5rem;">
+            You haven't generated any fitness profiles yet. Create your first profile to receive customized diets, workouts, and track progress here!
+        </p>
+        <a href="{{ url_for('profile') }}" class="btn btn-primary">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> Create First Profile
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
