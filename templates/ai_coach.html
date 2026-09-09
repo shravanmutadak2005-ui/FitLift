@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+
+{% block title %}Personal AI Fitness Coach & Situational Advisor - FitLift{% endblock %}
+
+{% block content %}
+<div class="ai-coach-page">
+    <div class="ai-coach-layout">
+        <!-- Sidebar: Athlete Context & Situational Presets -->
+        <aside class="ai-sidebar">
+            <div class="ai-sidebar-card">
+                <div class="ai-sidebar-header">
+                    <span class="badge badge-primary">
+                        <i class="fa-solid fa-brain"></i> Athlete Context Active
+                    </span>
+                    <h2 style="font-size: 1.15rem; margin-top: 0.35rem; font-family: var(--font-heading);">
+                        {{ current_user.name }}
+                    </h2>
+                    <span style="font-size: 0.8rem; color: var(--text-secondary);">@{{ current_user.username }}</span>
+                </div>
+
+                <!-- Context Stats Snapshot -->
+                <div id="athleteSnapshot" class="athlete-context-box" style="margin-top: 0.85rem;">
+                    {% if user_context %}
+                    <div class="context-stat-row">
+                        <span><i class="fa-solid fa-bullseye" style="color: var(--primary);"></i> Goal:</span>
+                        <strong>{{ user_context.goal or 'Not Set' }}</strong>
+                    </div>
+                    <div class="context-stat-row">
+                        <span><i class="fa-solid fa-weight-scale" style="color: var(--accent-cyan);"></i> Weight:</span>
+                        <strong>{{ user_context.weight or '—' }} kg &rarr; {{ user_context.target_weight or '—' }} kg</strong>
+                    </div>
+                    <div class="context-stat-row">
+                        <span><i class="fa-solid fa-utensils" style="color: var(--accent-green);"></i> Diet:</span>
+                        <strong>{{ user_context.dietary_preference or 'Standard' }}</strong>
+                    </div>
+                    {% if user_context.allergies and user_context.allergies != 'None' %}
+                    <div class="context-stat-row">
+                        <span><i class="fa-solid fa-shield-halved" style="color: var(--accent-amber);"></i> Allergies:</span>
+                        <strong style="color: var(--accent-amber);">{{ user_context.allergies }}</strong>
+                    </div>
+                    {% endif %}
+
+                    {% if user_context.personal_records and user_context.personal_records|length > 0 %}
+                    <div class="context-prs-list">
+                        <div class="context-prs-title"><i class="fa-solid fa-trophy" style="color: var(--accent-amber);"></i> Your Top PRs in Vault:</div>
+                        {% for pr in user_context.personal_records[:3] %}
+                        <div class="context-pr-tag">
+                            {{ pr.exercise }}: <strong>{{ pr.weight }} kg</strong> ({{ pr.reps }}r)
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% else %}
+                    <p style="font-size: 0.85rem; color: var(--text-secondary);">
+                        Complete your body metrics in <a href="{{ url_for('profile') }}" style="color: var(--primary);">Edit Profile</a> to unlock deep contextual reasoning.
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Situational Scenarios -->
+            <div class="ai-sidebar-card" style="margin-top: 1.25rem;">
+                <h3 class="scenario-heading">
+                    <i class="fa-solid fa-bolt" style="color: var(--primary);"></i>
+                    Real-Life Situations
+                </h3>
+                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.85rem;">
+                    Tap any common scenario to consult your coach instantly:
+                </p>
+
+                <div class="scenario-buttons">
+                    <button type="button" class="btn-scenario" onclick="triggerSituation('soreness', 'I am feeling sore and fatigued today. Should I train through it or take a rest day?')">
+                        <i class="fa-solid fa-heart-crack" style="color: #ef4444;"></i>
+                        <span>Soreness & Recovery</span>
+                    </button>
+
+                    <button type="button" class="btn-scenario" onclick="triggerSituation('plateau', 'I hit a strength plateau on my main lifts and cannot increase weight. How do I break through?')">
+                        <i class="fa-solid fa-mountain" style="color: var(--accent-amber);"></i>
+                        <span>Strength Plateau</span>
+                    </button>
+
+                    <button type="button" class="btn-scenario" onclick="triggerSituation('quick_workout', 'I only have 25 minutes to work out today. What high-density workout should I do?')">
+                        <i class="fa-solid fa-stopwatch" style="color: var(--accent-cyan);"></i>
+                        <span>25-Min Express Workout</span>
+                    </button>
+
+                    <button type="button" class="btn-scenario" onclick="triggerSituation('nutrition', 'I fell short on my protein and calories today. What quick meals or snacks should I eat?')">
+                        <i class="fa-solid fa-drumstick-bite" style="color: var(--accent-green);"></i>
+                        <span>Missed Protein / Diet</span>
+                    </button>
+
+                    <button type="button" class="btn-scenario" onclick="triggerSituation('injury_recovery', 'My shoulders or knees feel slight discomfort during pressing/squats. What safe exercise swaps can I do?')">
+                        <i class="fa-solid fa-shield-halved" style="color: #a855f7;"></i>
+                        <span>Joint Aches & Swaps</span>
+                    </button>
+
+                    <button type="button" class="btn-scenario" onclick="triggerSituation('travel', 'I am traveling in a hotel with no gym equipment. Give me a challenging workout protocol.')">
+                        <i class="fa-solid fa-plane" style="color: #38bdf8;"></i>
+                        <span>Travel / No Equipment</span>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main class="ai-chat-main">
+            <!-- Chat Window Header -->
+            <div class="chat-window-header">
+                <div class="chat-header-identity">
+                    <div class="ai-avatar-glow">
+                        <i class="fa-solid fa-robot"></i>
+                    </div>
+                    <div>
+                        <div class="ai-coach-name">FitAI Personal Advisor</div>
+                        <div class="ai-coach-status">
+                            <span class="status-dot"></span>
+                            <span>Advising {{ current_user.name }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chat-header-controls">
+                    <a href="{{ url_for('progress') }}" class="btn btn-secondary btn-sm" title="View Workout Progress & PRs">
+                        <i class="fa-solid fa-trophy"></i> My PR Vault
+                    </a>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="clearChat()" title="Restart consultation">
+                        <i class="fa-solid fa-trash-arrow-up"></i> Clear
+                    </button>
+                </div>
+            </div>
+
+            <!-- Chat Message Stream -->
+            <div id="chatMessages" class="chat-messages-container">
+                <!-- Welcome greeting -->
+                <div class="chat-bubble chat-bubble-ai">
+                    <div class="bubble-avatar">
+                        <i class="fa-solid fa-robot"></i>
+                    </div>
+                    <div class="bubble-content">
+                        <div class="bubble-title">FitAI Coach</div>
+                        <p>
+                            Hello <strong>{{ current_user.name }}</strong>! 👋 I am your private AI Fitness & Nutrition Coach.
+                        </p>
+                        <p style="margin-top: 0.5rem;">
+                            I monitor your <strong>{{ user_context.goal if user_context else 'fitness' }}</strong> targets, body metrics, and personal records. How is your body feeling today, or what situation can I guide you with?
+                        </p>
+                        <div class="quick-chips">
+                            <button type="button" class="chip" onclick="quickAsk('How should I warm up for a heavy squat session?')">Heavy Warm-up</button>
+                            <button type="button" class="chip" onclick="quickAsk('Can I drink whey protein on rest days?')">Whey on Rest Days</button>
+                            <button type="button" class="chip" onclick="quickAsk('How many rest days between chest workouts?')">Chest Recovery Days</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Historical Messages -->
+                {% for msg in chat_history %}
+                <div class="chat-bubble {% if msg.sender == 'user' %}chat-bubble-user{% else %}chat-bubble-ai{% endif %}">
+                    <div class="bubble-avatar">
+                        <i class="fa-solid {% if msg.sender == 'user' %}fa-user{% else %}fa-robot{% endif %}"></i>
+                    </div>
+                    <div class="bubble-content">
+                        <div class="bubble-title">{% if msg.sender == 'user' %}You{% else %}FitAI Coach{% endif %}</div>
+                        <div class="markdown-rendered">{{ msg.message|replace('\n', '<br>')|safe }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Chat Input Bar -->
+            <div class="chat-input-bar">
+                <form id="chatForm" onsubmit="sendMessage(event)" class="chat-form">
+                    <div class="chat-input-wrapper">
+                        <textarea id="userInput" class="chat-textarea" 
+                                  placeholder="Describe your situation (e.g. 'Sore after legs', 'Stuck on bench press', 'Missed protein', etc.)..." 
+                                  rows="1" onkeydown="handleKey(event)"></textarea>
+                        <button type="submit" id="sendBtn" class="btn btn-primary btn-send" title="Send message">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </button>
+                    </div>
+                    <div class="chat-input-hint">
+                        <span>Press <kbd>Enter</kbd> to send • <kbd>Shift + Enter</kbd> for new line</span>
+                        <span id="typingIndicator" class="typing-indicator" style="display: none;">
+                            <i class="fa-solid fa-circle-notch fa-spin"></i> Coach is analyzing your situation...
+                        </span>
+                    </div>
+                </form>
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentSituation = 'general';
+
+    function handleKey(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            document.getElementById('chatForm').dispatchEvent(new Event('submit'));
+        }
+    }
+
+    function scrollToBottom() {
+        const container = document.getElementById('chatMessages');
+        if (container) {
+            container.scrollTop = container.scrollHeight;
+        }
+    }
+
+    function quickAsk(question) {
+        document.getElementById('userInput').value = question;
+        document.getElementById('chatForm').dispatchEvent(new Event('submit'));
+    }
+
+    function triggerSituation(tag, promptText) {
+        currentSituation = tag;
+        document.getElementById('userInput').value = promptText;
+        document.getElementById('chatForm').dispatchEvent(new Event('submit'));
+    }
+
+    function formatMarkdownText(text) {
+        let formatted = text
+            .replace(/^### (.*$)/gim, '<h4 class="ai-reply-heading">$1</h4>')
+            .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
+            .replace(/^\s*[-•]\s+(.*$)/gim, '<li class="ai-reply-bullet">$1</li>')
+            .replace(/\n\n/g, '<br><br>')
+            .replace(/\n/g, '<br>');
+        return formatted;
+    }
+
+    async function sendMessage(e) {
+        e.preventDefault();
+        const input = document.getElementById('userInput');
+        const text = input.value.trim();
+        if (!text) return;
+
+        const sendBtn = document.getElementById('sendBtn');
+        const typing = document.getElementById('typingIndicator');
+        const container = document.getElementById('chatMessages');
+
+        // Append user bubble
+        const userBubble = document.createElement('div');
+        userBubble.className = 'chat-bubble chat-bubble-user';
+        userBubble.innerHTML = `
+            <div class="bubble-avatar"><i class="fa-solid fa-user"></i></div>
+            <div class="bubble-content">
+                <div class="bubble-title">You</div>
+                <div>${text.replace(/\n/g, '<br>')}</div>
+            </div>
+        `;
+        container.appendChild(userBubble);
+        input.value = '';
+        input.style.height = 'auto';
+        scrollToBottom();
+
+        // Show typing indicator
+        sendBtn.disabled = true;
+        typing.style.display = 'inline-flex';
+
+        try {
+            const res = await fetch("{{ url_for('api_chat') }}", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    message: text,
+                    situation_tag: currentSituation
+                })
+            });
+
+            const data = await res.json();
+            currentSituation = 'general';
+
+            // Append AI response bubble
+            const aiBubble = document.createElement('div');
+            aiBubble.className = 'chat-bubble chat-bubble-ai';
+            aiBubble.innerHTML = `
+                <div class="bubble-avatar"><i class="fa-solid fa-robot"></i></div>
+                <div class="bubble-content">
+                    <div class="bubble-title">FitAI Coach</div>
+                    <div class="markdown-rendered">${formatMarkdownText(data.reply)}</div>
+                </div>
+            `;
+            container.appendChild(aiBubble);
+            scrollToBottom();
+        } catch (err) {
+            console.error(err);
+            const errBubble = document.createElement('div');
+            errBubble.className = 'chat-bubble chat-bubble-ai';
+            errBubble.innerHTML = `
+                <div class="bubble-avatar"><i class="fa-solid fa-robot"></i></div>
+                <div class="bubble-content" style="color: #ef4444;">
+                    <div class="bubble-title">Coach Offline</div>
+                    <p>Unable to connect to the advisor engine. Please try again.</p>
+                </div>
+            `;
+            container.appendChild(errBubble);
+        } finally {
+            sendBtn.disabled = false;
+            typing.style.display = 'none';
+            input.focus();
+        }
+    }
+
+    async function clearChat() {
+        if (!confirm('Clear your consultation history?')) return;
+        try {
+            await fetch("{{ url_for('api_chat_clear') }}", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({})
+            });
+            window.location.reload();
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        scrollToBottom();
+    });
+</script>
+{% endblock %}

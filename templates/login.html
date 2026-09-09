@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Sign In - FitLift{% endblock %}
+
+{% block content %}
+<div class="auth-wrapper">
+    <div class="auth-card">
+        <!-- Auth Header -->
+        <div class="auth-header">
+            <div class="auth-logo-badge">
+                <i class="fa-solid fa-dumbbell"></i>
+            </div>
+            <h1 class="auth-title">Welcome Back to <span class="gradient-text">FitLift</span></h1>
+            <p class="auth-subtitle">Sign in to access your personal workout logs, PR vault, and AI fitness advisor.</p>
+        </div>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                <div class="alert-banner {% if category == 'success' %}alert-pr-success{% elif category == 'error' or category == 'warning' %}alert-danger{% else %}alert-info{% endif %}">
+                    <i class="fa-solid {% if category == 'success' %}fa-check-circle{% elif category == 'error' or category == 'warning' %}fa-triangle-exclamation{% else %}fa-circle-info{% endif %}"></i>
+                    <span>{{ message }}</span>
+                    <button type="button" class="alert-close" onclick="this.parentElement.remove()">&times;</button>
+                </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Login Form -->
+        <form method="POST" action="{{ url_for('login', next=request.args.get('next')) }}" class="auth-form">
+            <div class="form-group form-group-full">
+                <label class="form-label" for="username">
+                    <i class="fa-solid fa-user"></i> Username or Email
+                </label>
+                <div class="input-wrapper">
+                    <input type="text" id="username" name="username" class="form-input" 
+                           placeholder="Enter your username or email" required autofocus autocomplete="username">
+                </div>
+            </div>
+
+            <div class="form-group form-group-full">
+                <label class="form-label" for="password">
+                    <i class="fa-solid fa-lock"></i> Password
+                </label>
+                <div class="input-wrapper">
+                    <input type="password" id="password" name="password" class="form-input" 
+                           placeholder="Enter your password" required autocomplete="current-password">
+                    <button type="button" class="btn-toggle-pw" onclick="togglePassword('password', this)" title="Show/Hide password">
+                        <i class="fa-solid fa-eye"></i>
+                    </button>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-auth">
+                <i class="fa-solid fa-right-to-bracket"></i> Sign In to FitLift
+            </button>
+        </form>
+
+        <!-- Auth Footer Switch -->
+        <div class="auth-footer">
+            <p>First time visiting FitLift?</p>
+            <a href="{{ url_for('register') }}" class="btn btn-secondary btn-sm" style="width: 100%; text-align: center;">
+                <i class="fa-solid fa-user-plus"></i> Create an Account (Sign Up)
+            </a>
+        </div>
+
+        <!-- Demo Account Note -->
+        <div class="auth-demo-hint">
+            <i class="fa-solid fa-lightbulb" style="color: var(--accent-amber);"></i>
+            <span>Existing profile account: <strong>shravan</strong> &bull; Password: <strong>fitlift123</strong></span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function togglePassword(inputId, btn) {
+        const input = document.getElementById(inputId);
+        const icon = btn.querySelector('i');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.className = 'fa-solid fa-eye-slash';
+        } else {
+            input.type = 'password';
+            icon.className = 'fa-solid fa-eye';
+        }
+    }
+</script>
+{% endblock %}

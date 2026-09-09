@@ -1,0 +1,571 @@
+{% extends "base.html" %}
+
+{% block title %}Workout Progress & Personal Records (PRs) - FitLift{% endblock %}
+
+{% block content %}
+<div class="progress-container">
+    <!-- Header -->
+    <div class="dashboard-header">
+        <div class="dashboard-title">
+            <span class="badge badge-amber" style="margin-bottom: 0.5rem;">
+                <i class="fa-solid fa-trophy"></i> {{ current_user.name }}'s Personal Best Vault
+            </span>
+            <h1>Workout Progress & <span class="gradient-text">Personal Records</span></h1>
+            <p>Track your highest weight lifted across exercises, calculate estimated 1-Rep Maxes, and watch your strength evolve.</p>
+        </div>
+        <div class="dashboard-actions">
+            <button type="button" class="btn btn-primary btn-submit-pr" onclick="toggleLogModal(true)">
+                <i class="fa-solid fa-trophy"></i> Submit New Log Lift
+            </button>
+        </div>
+    </div>
+
+    <!-- Flash Messages / PR Celebrations -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert-banner {% if category == 'success' %}alert-pr-success{% else %}alert-info{% endif %}">
+                <i class="fa-solid {% if category == 'success' %}fa-crown{% else %}fa-circle-info{% endif %}"></i>
+                <span>{{ message }}</span>
+                <button type="button" class="alert-close" onclick="this.parentElement.remove()">&times;</button>
+            </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- Progress Overview Metric Cards -->
+    <div class="metrics-grid" style="margin-bottom: 2rem;">
+        <!-- Heaviest Lift Ever -->
+        <div class="metric-card metric-card-pr">
+            <div class="metric-header">
+                <span>Heaviest Recorded Lift</span>
+                <i class="fa-solid fa-trophy" style="color: var(--accent-amber);"></i>
+            </div>
+            <div class="metric-value">
+                {% if stats.heaviest_lift %}
+                    {{ stats.heaviest_lift.weight_lifted }}<span class="metric-unit">kg</span>
+                {% else %}
+                    0.0<span class="metric-unit">kg</span>
+                {% endif %}
+            </div>
+            <div class="metric-desc">
+                {% if stats.heaviest_lift %}
+                    <strong>{{ stats.heaviest_lift.exercise_name }}</strong> ({{ stats.heaviest_lift.reps }} reps) • {{ stats.heaviest_lift.logged_date }}
+                {% else %}
+                    Log your first lift to set an all-time record
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Unique Exercises Tracked -->
+        <div class="metric-card">
+            <div class="metric-header">
+                <span>Exercises Mastered</span>
+                <i class="fa-solid fa-dumbbell" style="color: var(--accent-cyan);"></i>
+            </div>
+            <div class="metric-value">
+                {{ stats.unique_exercises }}<span class="metric-unit">movements</span>
+            </div>
+            <div class="metric-desc">
+                Across Chest, Back, Legs, Shoulders, Arms, and Core
+            </div>
+        </div>
+
+        <!-- Total Lift Logs -->
+        <div class="metric-card">
+            <div class="metric-header">
+                <span>Total Workouts Logged</span>
+                <i class="fa-solid fa-chart-line" style="color: var(--accent-green);"></i>
+            </div>
+            <div class="metric-value">
+                {{ stats.total_logs }}<span class="metric-unit">entries</span>
+            </div>
+            <div class="metric-desc">
+                Consistent volume tracked in your personal vault
+            </div>
+        </div>
+    </div>
+
+    <!-- Inline Quick Log Lift Card -->
+    <div class="card quick-log-card" id="quickLogSection" style="margin-bottom: 2rem; border-color: rgba(245, 158, 11, 0.35); background: linear-gradient(145deg, rgba(26, 36, 56, 0.9), rgba(19, 27, 46, 0.95));">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <div class="auth-logo-badge" style="width: 42px; height: 42px; font-size: 1.1rem; margin-bottom: 0;">
+                    <i class="fa-solid fa-trophy"></i>
+                </div>
+                <div>
+                    <h2 style="font-size: 1.25rem; font-family: var(--font-heading); margin-bottom: 0.15rem;">Record New Lift to PR Vault</h2>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0;">Log today's workout weight & reps &bull; new highest weights automatically become all-time PR records!</p>
+                </div>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="toggleQuickLogCard()">
+                <i class="fa-solid fa-angles-up" id="toggleIcon"></i> <span id="toggleText">Collapse Form</span>
+            </button>
+        </div>
+
+        <form method="POST" action="{{ url_for('add_progress') }}" id="inlineLogForm">
+            <div class="form-grid">
+                <!-- Exercise Selection / Datalist -->
+                <div class="form-group form-group-full">
+                    <label class="form-label" for="inline_exercise_name">
+                        <i class="fa-solid fa-dumbbell"></i> Exercise Name
+                    </label>
+                    <div class="input-wrapper">
+                        <input type="text" id="inline_exercise_name" name="exercise_name" class="form-input" 
+                               list="inlineExerciseList" placeholder="e.g. Barbell Bench Press, Barbell Squat, Deadlift, Dumbbell Press..." required 
+                               oninput="autoSelectInlineCategory(this.value)">
+                        <datalist id="inlineExerciseList">
+                            {% for ex in exercises %}
+                            <option value="{{ ex.name }}" data-category="{{ ex.category }}">{{ ex.category }}</option>
+                            {% endfor %}
+                        </datalist>
+                    </div>
+                </div>
+
+                <!-- Muscle Group Category -->
+                <div class="form-group">
+                    <label class="form-label" for="inline_category">
+                        <i class="fa-solid fa-layer-group"></i> Muscle Group
+                    </label>
+                    <div class="input-wrapper">
+                        <select id="inline_category" name="category" class="form-select" required>
+                            <option value="Chest">Chest</option>
+                            <option value="Back">Back</option>
+                            <option value="Legs">Legs</option>
+                            <option value="Shoulders">Shoulders</option>
+                            <option value="Arms">Arms</option>
+                            <option value="Core">Core / Abs</option>
+                            <option value="Full Body">Full Body</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Date -->
+                <div class="form-group">
+                    <label class="form-label" for="inline_logged_date">
+                        <i class="fa-solid fa-calendar-day"></i> Date
+                    </label>
+                    <div class="input-wrapper">
+                        <input type="date" id="inline_logged_date" name="logged_date" class="form-input" value="{{ today }}" required>
+                    </div>
+                </div>
+
+                <!-- Weight Lifted -->
+                <div class="form-group">
+                    <label class="form-label" for="inline_weight_lifted">
+                        <i class="fa-solid fa-weight-hanging"></i> Weight Lifted
+                    </label>
+                    <div class="input-wrapper input-with-unit">
+                        <input type="number" step="0.5" id="inline_weight_lifted" name="weight_lifted" class="form-input" placeholder="e.g. 95" required oninput="calcInlineLive1RM()">
+                        <span class="unit-tag">kg</span>
+                    </div>
+                </div>
+
+                <!-- Reps -->
+                <div class="form-group">
+                    <label class="form-label" for="inline_reps">
+                        <i class="fa-solid fa-repeat"></i> Repetitions
+                    </label>
+                    <div class="input-wrapper input-with-unit">
+                        <input type="number" id="inline_reps" name="reps" class="form-input" min="1" max="100" placeholder="e.g. 5" required oninput="calcInlineLive1RM()">
+                        <span class="unit-tag">reps</span>
+                    </div>
+                </div>
+
+                <!-- Sets -->
+                <div class="form-group">
+                    <label class="form-label" for="inline_sets">
+                        <i class="fa-solid fa-list-ol"></i> Sets Completed
+                    </label>
+                    <div class="input-wrapper input-with-unit">
+                        <input type="number" id="inline_sets" name="sets" class="form-input" min="1" max="20" value="3" required>
+                        <span class="unit-tag">sets</span>
+                    </div>
+                </div>
+
+                <!-- Live 1RM Preview -->
+                <div class="form-group">
+                    <label class="form-label">
+                        <i class="fa-solid fa-bolt"></i> Est. 1-Rep Max
+                    </label>
+                    <div class="live-1rm-box" id="inlineLive1RM">
+                        — kg
+                    </div>
+                </div>
+
+                <!-- Notes -->
+                <div class="form-group form-group-full">
+                    <label class="form-label" for="inline_notes">
+                        <i class="fa-solid fa-pen-to-square"></i> Workout Notes (Optional)
+                    </label>
+                    <div class="input-wrapper">
+                        <input type="text" id="inline_notes" name="notes" class="form-input" placeholder="e.g. Hit a smooth PR, felt light, used chalk">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Big Submit Button -->
+            <div style="margin-top: 1.5rem;">
+                <button type="submit" class="btn btn-primary btn-submit-pr" style="width: 100%; padding: 0.95rem; font-size: 1.05rem; font-weight: 700; box-shadow: 0 4px 20px rgba(245, 158, 11, 0.4); background: linear-gradient(135deg, #ff7a18 0%, #ea580c 50%, #f59e0b 100%);">
+                    <i class="fa-solid fa-trophy"></i> Submit New Log Lift & Record in PR Vault
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Category Filter Tabs -->
+    <div class="category-filter-bar">
+        <span class="filter-label"><i class="fa-solid fa-filter"></i> Filter Muscle:</span>
+        <div class="category-pills">
+            {% for cat in ['All', 'Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core'] %}
+            <a href="{{ url_for('progress', category=cat) }}" 
+               class="category-pill {% if selected_category == cat %}active{% endif %}">
+                {{ cat }}
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Section 1: Highest Weight Lifted (Personal Records Showcase) -->
+    <div class="records-section">
+        <div class="section-header-inline">
+            <h2 class="section-title" style="margin-bottom: 0;">
+                <i class="fa-solid fa-medal" style="color: var(--accent-amber);"></i>
+                {{ current_user.name }}'s Highest Weight Lifted (PRs)
+            </h2>
+            <span class="badge badge-cyan">{{ personal_records|length }} Exercises in {{ selected_category }}</span>
+        </div>
+
+        {% if personal_records and personal_records|length > 0 %}
+        <div class="pr-grid">
+            {% for pr in personal_records %}
+            <div class="pr-card">
+                <div class="pr-card-top">
+                    <span class="pr-category-badge pr-badge-{{ pr.category|lower }}">
+                        {{ pr.category }}
+                    </span>
+                    <span class="pr-count-badge">
+                        <i class="fa-solid fa-repeat"></i> {{ pr.log_count }} logs
+                    </span>
+                </div>
+
+                <h3 class="pr-exercise-title">{{ pr.exercise_name }}</h3>
+
+                <div class="pr-stat-row">
+                    <div class="pr-weight-box">
+                        <span class="pr-weight-num">{{ pr.weight_lifted }}</span>
+                        <span class="pr-weight-unit">kg</span>
+                    </div>
+                    <div class="pr-1rm-box">
+                        <span class="pr-1rm-label">Estimated 1RM</span>
+                        <span class="pr-1rm-val">{{ pr.estimated_1rm }} kg</span>
+                    </div>
+                </div>
+
+                <div class="pr-meta-info">
+                    <span><i class="fa-solid fa-fire"></i> Best Set: <strong>{{ pr.reps }} reps</strong></span>
+                    <span><i class="fa-solid fa-calendar-day"></i> {{ pr.logged_date }}</span>
+                </div>
+
+                {% if pr.notes %}
+                <div class="pr-notes-snippet">
+                    <i class="fa-solid fa-quote-left"></i> {{ pr.notes }}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="card" style="text-align: center; padding: 2.5rem 1.5rem; margin-bottom: 2rem;">
+            <i class="fa-solid fa-dumbbell" style="font-size: 2.5rem; color: var(--text-muted); margin-bottom: 0.75rem;"></i>
+            <h3>No Personal Records Found for {{ selected_category }}</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                You haven't recorded any lifts in this category yet. Click "Log New Lift" to track your first workout!
+            </p>
+            <button type="button" class="btn btn-primary btn-submit-pr btn-sm" onclick="toggleLogModal(true)">
+                <i class="fa-solid fa-trophy"></i> Submit New Log Lift & Record in PR Vault
+            </button>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Section 2: Workout History Log Table -->
+    <div class="history-section" style="margin-top: 3rem;">
+        <div class="section-header-inline">
+            <h2 class="section-title" style="margin-bottom: 0;">
+                <i class="fa-solid fa-clock-rotate-left" style="color: var(--primary);"></i>
+                Exercise Progression Log History
+            </h2>
+            <span style="font-size: 0.85rem; color: var(--text-secondary);">Showing recent entries for {{ current_user.name }}</span>
+        </div>
+
+        {% if history and history|length > 0 %}
+        <div class="table-responsive">
+            <table class="modern-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Exercise</th>
+                        <th>Category</th>
+                        <th>Weight</th>
+                        <th>Sets × Reps</th>
+                        <th>Est. 1RM</th>
+                        <th>Notes</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for h in history %}
+                    <tr>
+                        <td style="white-space: nowrap; color: var(--text-secondary);">
+                            <i class="fa-solid fa-calendar" style="font-size: 0.75rem; margin-right: 0.25rem;"></i>
+                            {{ h.logged_date }}
+                        </td>
+                        <td>
+                            <strong>{{ h.exercise_name }}</strong>
+                        </td>
+                        <td>
+                            <span class="badge badge-sm badge-outline-{{ h.category|lower }}">{{ h.category }}</span>
+                        </td>
+                        <td>
+                            <span class="weight-highlight">{{ h.weight_lifted }} kg</span>
+                        </td>
+                        <td>
+                            {{ h.sets }} × {{ h.reps }} reps
+                        </td>
+                        <td style="color: var(--accent-cyan); font-weight: 600;">
+                            {{ h.estimated_1rm }} kg
+                        </td>
+                        <td style="max-width: 200px; font-size: 0.85rem; color: var(--text-secondary);">
+                            {{ h.notes or '—' }}
+                        </td>
+                        <td>
+                            <form method="POST" action="{{ url_for('delete_progress', record_id=h.id) }}" onsubmit="return confirm('Delete this exercise log entry?');" style="display: inline;">
+                                <button type="submit" class="btn-icon-delete" title="Delete log">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="card" style="text-align: center; padding: 2rem;">
+            <p style="color: var(--text-secondary);">No workout logs available yet.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Log Exercise Modal -->
+<div id="logModal" class="modal-backdrop" style="display: none;">
+    <div class="modal-card">
+        <div class="modal-header">
+            <div class="modal-title">
+                <i class="fa-solid fa-dumbbell" style="color: var(--primary);"></i>
+                <span>Log Lift for {{ current_user.name }}</span>
+            </div>
+            <button type="button" class="modal-close" onclick="toggleLogModal(false)">&times;</button>
+        </div>
+
+        <form method="POST" action="{{ url_for('add_progress') }}">
+            <div class="form-grid">
+                <!-- Exercise Selection / Datalist -->
+                <div class="form-group form-group-full">
+                    <label class="form-label" for="exercise_name">
+                        <i class="fa-solid fa-dumbbell"></i> Exercise Name
+                    </label>
+                    <div class="input-wrapper">
+                        <input type="text" id="exercise_name" name="exercise_name" class="form-input" 
+                               list="exerciseList" placeholder="e.g. Barbell Bench Press or type custom..." required 
+                               oninput="autoSelectCategory(this.value)">
+                        <datalist id="exerciseList">
+                            {% for ex in exercises %}
+                            <option value="{{ ex.name }}" data-category="{{ ex.category }}">{{ ex.category }}</option>
+                            {% endfor %}
+                        </datalist>
+                    </div>
+                </div>
+
+                <!-- Category -->
+                <div class="form-group">
+                    <label class="form-label" for="category">
+                        <i class="fa-solid fa-layer-group"></i> Muscle Group
+                    </label>
+                    <div class="input-wrapper">
+                        <select id="category" name="category" class="form-select" required>
+                            <option value="Chest">Chest</option>
+                            <option value="Back">Back</option>
+                            <option value="Legs">Legs</option>
+                            <option value="Shoulders">Shoulders</option>
+                            <option value="Arms">Arms</option>
+                            <option value="Core">Core / Abs</option>
+                            <option value="Full Body">Full Body</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Date -->
+                <div class="form-group">
+                    <label class="form-label" for="logged_date">
+                        <i class="fa-solid fa-calendar-day"></i> Date
+                    </label>
+                    <div class="input-wrapper">
+                        <input type="date" id="logged_date" name="logged_date" class="form-input" value="{{ today }}" required>
+                    </div>
+                </div>
+
+                <!-- Weight Lifted -->
+                <div class="form-group">
+                    <label class="form-label" for="weight_lifted">
+                        <i class="fa-solid fa-weight-hanging"></i> Weight Lifted
+                    </label>
+                    <div class="input-wrapper input-with-unit">
+                        <input type="number" step="0.5" id="weight_lifted" name="weight_lifted" class="form-input" placeholder="e.g. 85" required oninput="calcLive1RM()">
+                        <span class="unit-tag">kg</span>
+                    </div>
+                </div>
+
+                <!-- Reps -->
+                <div class="form-group">
+                    <label class="form-label" for="reps">
+                        <i class="fa-solid fa-repeat"></i> Repetitions
+                    </label>
+                    <div class="input-wrapper input-with-unit">
+                        <input type="number" id="reps" name="reps" class="form-input" min="1" max="100" placeholder="e.g. 8" required oninput="calcLive1RM()">
+                        <span class="unit-tag">reps</span>
+                    </div>
+                </div>
+
+                <!-- Sets -->
+                <div class="form-group">
+                    <label class="form-label" for="sets">
+                        <i class="fa-solid fa-list-ol"></i> Sets Completed
+                    </label>
+                    <div class="input-wrapper input-with-unit">
+                        <input type="number" id="sets" name="sets" class="form-input" min="1" max="20" value="3" required>
+                        <span class="unit-tag">sets</span>
+                    </div>
+                </div>
+
+                <!-- Live 1RM Preview -->
+                <div class="form-group">
+                    <label class="form-label">
+                        <i class="fa-solid fa-bolt"></i> Est. 1-Rep Max
+                    </label>
+                    <div class="live-1rm-box" id="live1RM">
+                        — kg
+                    </div>
+                </div>
+
+                <!-- Notes -->
+                <div class="form-group form-group-full">
+                    <label class="form-label" for="notes">
+                        <i class="fa-solid fa-pen-to-square"></i> Workout Notes (Optional)
+                    </label>
+                    <div class="input-wrapper">
+                        <input type="text" id="notes" name="notes" class="form-input" placeholder="e.g. Felt strong, good tempo, chalk grip">
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-actions" style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <button type="button" class="btn btn-secondary" onclick="toggleLogModal(false)">Cancel</button>
+                <button type="submit" class="btn btn-primary btn-submit-pr">
+                    <i class="fa-solid fa-trophy"></i> Submit New Log Lift & Record in PR Vault
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function toggleLogModal(show) {
+        const modal = document.getElementById('logModal');
+        if (modal) {
+            modal.style.display = show ? 'flex' : 'none';
+            if (show) {
+                document.getElementById('weight_lifted').focus();
+            }
+        }
+    }
+
+    function toggleQuickLogCard() {
+        const form = document.getElementById('inlineLogForm');
+        const icon = document.getElementById('toggleIcon');
+        const text = document.getElementById('toggleText');
+        if (!form) return;
+        if (form.style.display === 'none') {
+            form.style.display = 'block';
+            if (icon) {
+                icon.className = 'fa-solid fa-angles-up';
+            }
+            if (text) text.innerText = 'Collapse Form';
+        } else {
+            form.style.display = 'none';
+            if (icon) {
+                icon.className = 'fa-solid fa-angles-down';
+            }
+            if (text) text.innerText = 'Expand Form';
+        }
+    }
+
+    const exerciseCategoryMap = {
+        {% for ex in exercises %}
+        "{{ ex.name|lower }}": "{{ ex.category }}",
+        {% endfor %}
+    };
+
+    function autoSelectCategory(inputVal) {
+        const cat = exerciseCategoryMap[inputVal.trim().toLowerCase()];
+        if (cat) {
+            const catSelect = document.getElementById('category');
+            if (catSelect) catSelect.value = cat;
+        }
+    }
+
+    function autoSelectInlineCategory(inputVal) {
+        const cat = exerciseCategoryMap[inputVal.trim().toLowerCase()];
+        if (cat) {
+            const catSelect = document.getElementById('inline_category');
+            if (catSelect) catSelect.value = cat;
+        }
+    }
+
+    function calcLive1RM() {
+        const w = parseFloat(document.getElementById('weight_lifted').value);
+        const r = parseInt(document.getElementById('reps').value);
+        const display = document.getElementById('live1RM');
+        if (w > 0 && r > 0) {
+            const e1rm = r === 1 ? w : Math.round((w * (1 + r / 30)) * 10) / 10;
+            display.innerText = `${e1rm} kg (Epley Formula)`;
+            display.classList.add('active');
+        } else {
+            display.innerText = '— kg';
+            display.classList.remove('active');
+        }
+    }
+
+    function calcInlineLive1RM() {
+        const w = parseFloat(document.getElementById('inline_weight_lifted').value);
+        const r = parseInt(document.getElementById('inline_reps').value);
+        const display = document.getElementById('inlineLive1RM');
+        if (w > 0 && r > 0) {
+            const e1rm = r === 1 ? w : Math.round((w * (1 + r / 30)) * 10) / 10;
+            display.innerText = `${e1rm} kg (Epley Formula)`;
+            display.classList.add('active');
+        } else {
+            display.innerText = '— kg';
+            display.classList.remove('active');
+        }
+    }
+
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') toggleLogModal(false);
+    });
+</script>
+{% endblock %}

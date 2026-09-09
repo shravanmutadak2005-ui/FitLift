@@ -16,15 +16,18 @@
     </h1>
 
     <p class="hero-subtitle">
-        Calculate your exact metabolic rate, macro split, structured meal timing, goal-based workout routine, and weekly grocery checklist in seconds.
+        Calculate your exact metabolic rate, macro split, structured meal timing, goal-based workout routine, track highest weight lifted, and consult your personal situational AI coach.
     </p>
 
     <div class="hero-actions">
         <a href="{{ url_for('profile') }}" class="btn btn-primary">
             <i class="fa-solid fa-calculator"></i> Build My Plan Now
         </a>
-        <a href="{{ url_for('history') }}" class="btn btn-secondary">
-            <i class="fa-solid fa-clock-rotate-left"></i> View Past Profiles
+        <a href="{{ url_for('progress') }}" class="btn btn-secondary">
+            <i class="fa-solid fa-trophy"></i> PR & Strength Vault
+        </a>
+        <a href="{{ url_for('ai_coach') }}" class="btn btn-secondary">
+            <i class="fa-solid fa-robot"></i> Chat with AI Coach
         </a>
     </div>
 </div>
@@ -47,6 +50,26 @@
         <h3>Targeted Macronutrients</h3>
         <p>
             Custom high-protein, carb, and healthy fat splits designed to maximize recovery, preserve lean muscle, and drive fat loss.
+        </p>
+    </div>
+
+    <div class="feature-card">
+        <div class="feature-icon-box feature-icon-amber">
+            <i class="fa-solid fa-trophy"></i>
+        </div>
+        <h3>PR & Strength Vault</h3>
+        <p>
+            Record highest weights lifted across Chest, Back, Legs, Shoulders, and Arms. Celebrate personal records with real-time 1-Rep Max tracking.
+        </p>
+    </div>
+
+    <div class="feature-card">
+        <div class="feature-icon-box feature-icon-purple">
+            <i class="fa-solid fa-robot"></i>
+        </div>
+        <h3>Situational AI Coach</h3>
+        <p>
+            Context-aware personal AI assistant that diagnoses muscle soreness, breaks strength plateaus, designs 25-min workouts, and fixes diet slip-ups.
         </p>
     </div>
 

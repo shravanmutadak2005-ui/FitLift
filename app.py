@@ -1,11 +1,39 @@
-from flask import Flask, render_template, request, redirect, url_for
+import os
+from functools import wraps
+from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session, g
 import sqlite3
-from database import create_database
+from datetime import datetime
+from database import (
+    create_database, get_personal_records, get_exercise_history,
+    get_progress_stats, log_exercise_record, delete_exercise_record,
+    save_chat_message, get_chat_history, clear_chat_history, calculate_1rm,
+    get_db_connection, register_user, authenticate_user, get_user_by_id,
+    update_user_profile
+)
+from ai_advisor import generate_situational_advice, get_user_context
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "fitlift_secret_key_pro_2026_auth")
 
-# Ensure database table exists on application startup
+# Ensure database tables exist on application startup
 create_database()
+
+@app.context_processor
+def inject_user():
+    """Inject current_user into all template renders."""
+    user_id = session.get("user_id")
+    current_user = get_user_by_id(user_id) if user_id else None
+    return dict(current_user=current_user)
+
+def login_required(f):
+    """Decorator requiring active session user."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if "user_id" not in session:
+            flash("Please sign in to access this page.", "warning")
+            return redirect(url_for("login", next=request.url))
+        return f(*args, **kwargs)
+    return decorated_function
 
 
 def get_diet_meals(goal, dietary_preference="Non-Vegetarian", allergies="None", meal_schedule="Standard (4-5 Meals)"):
@@ -872,15 +900,101 @@ def calculate_user_metrics(age, gender, height, weight, goal, target_weight, act
     }
 
 
+# ==============================================================================
+# Authentication & Onboarding Routes
+# ==============================================================================
+
 @app.route("/")
 def home():
-    return render_template("index.html")
+    """Initial entry point: redirect to dashboard if logged in, else to login page."""
+    if "user_id" in session:
+        return redirect(url_for("dashboard"))
+    return redirect(url_for("login"))
 
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    """Sign In page for registered users."""
+    if "user_id" in session:
+        return redirect(url_for("dashboard"))
+
+    if request.method == "POST":
+        username_or_email = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+
+        user = authenticate_user(username_or_email, password)
+        if user:
+            session["user_id"] = user["id"]
+            session["user_name"] = user["name"]
+            flash(f"Welcome back, {user['name']}! 💪", "success")
+
+            # Guide user to complete metrics if not yet completed
+            if not user.get("weight") or not user.get("goal"):
+                return redirect(url_for("profile"))
+
+            next_url = request.args.get("next")
+            return redirect(next_url or url_for("dashboard"))
+        else:
+            flash("Invalid username/email or password. Please try again.", "error")
+
+    return render_template("login.html")
+
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    """Sign Up page for first-time visitors."""
+    if "user_id" in session:
+        return redirect(url_for("dashboard"))
+
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        username = request.form.get("username", "").strip()
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "")
+        confirm_password = request.form.get("confirm_password", "")
+
+        if not name or not username or not password:
+            flash("Please fill in all required fields.", "error")
+            return render_template("register.html")
+
+        if password != confirm_password:
+            flash("Passwords do not match. Please re-enter.", "error")
+            return render_template("register.html")
+
+        new_user, error = register_user(name, username, password, email)
+        if error:
+            flash(error, "error")
+            return render_template("register.html")
+
+        # Automatically log the newly registered user in
+        session["user_id"] = new_user["id"]
+        session["user_name"] = new_user["name"]
+        flash(f"Welcome to FitLift, {new_user['name']}! Let's set up your body metrics.", "success")
+        return redirect(url_for("profile"))
+
+    return render_template("register.html")
+
+
+@app.route("/logout")
+def logout():
+    """Sign out the current user and clear session."""
+    session.clear()
+    flash("You have been signed out safely.", "info")
+    return redirect(url_for("login"))
+
+
+# ==============================================================================
+# User Profile & Dashboard Routes (Scoped to Logged-in User)
+# ==============================================================================
 
 @app.route("/profile", methods=["GET", "POST"])
+@login_required
 def profile():
+    """Manage body metrics, fitness goals, and dietary preferences for the logged-in user."""
+    user_id = session["user_id"]
+    user = get_user_by_id(user_id)
+
     if request.method == "POST":
-        name = request.form["name"].strip()
         age = int(request.form["age"])
         gender = request.form["gender"]
         height = float(request.form["height"])
@@ -892,117 +1006,240 @@ def profile():
         allergies = request.form.get("allergies", "None")
         meal_schedule = request.form.get("meal_schedule", "Standard (4-5 Meals)")
 
-        # Save user data in SQLite
-        conn = sqlite3.connect("fitlift.db")
-        cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO users
-            (name, age, gender, height, weight, goal, target_weight, activity_level, dietary_preference, allergies, meal_schedule, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
-        """, (name, age, gender, height, weight, goal, target_weight, activity_level, dietary_preference, allergies, meal_schedule))
-        user_id = cursor.lastrowid
-        conn.commit()
-        conn.close()
-
-        metrics = calculate_user_metrics(
-            age, gender, height, weight, goal, target_weight, activity_level,
-            dietary_preference, allergies, meal_schedule
+        update_user_profile(
+            user_id, age, gender, height, weight, goal, target_weight,
+            activity_level, dietary_preference, allergies, meal_schedule
         )
 
-        return render_template(
-            "dashboard.html",
-            user_id=user_id,
-            name=name,
-            age=age,
-            gender=gender,
-            height=height,
-            weight=weight,
-            target_weight=target_weight,
-            goal=goal,
-            activity_level=activity_level,
-            **metrics
-        )
+        flash("Your fitness plan has been updated and calibrated!", "success")
+        return redirect(url_for("dashboard"))
 
-    return render_template("profile.html")
+    return render_template("profile.html", user=user)
 
 
-@app.route("/dashboard/<int:user_id>")
-def view_dashboard(user_id):
-    """Load a specific user's plan from the database."""
-    conn = sqlite3.connect("fitlift.db")
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT id, name, age, gender, height, weight, goal, target_weight, activity_level,
-               dietary_preference, allergies, meal_schedule
-        FROM users WHERE id = ?
-    """, (user_id,))
-    row = cursor.fetchone()
-    conn.close()
+DEFAULT_EXERCISES = [
+    {"name": "Barbell Bench Press", "category": "Chest"},
+    {"name": "Incline Dumbbell Press", "category": "Chest"},
+    {"name": "Dips (Chest Focus)", "category": "Chest"},
+    {"name": "Cable Crossover", "category": "Chest"},
+    {"name": "Push-Ups (Weighted)", "category": "Chest"},
+    {"name": "Conventional Deadlift", "category": "Back"},
+    {"name": "Barbell Bent-Over Row", "category": "Back"},
+    {"name": "Weighted Pull-Up", "category": "Back"},
+    {"name": "Lat Pulldown", "category": "Back"},
+    {"name": "Seated Cable Row", "category": "Back"},
+    {"name": "Barbell Back Squat", "category": "Legs"},
+    {"name": "Romanian Deadlift", "category": "Legs"},
+    {"name": "Leg Press", "category": "Legs"},
+    {"name": "Bulgarian Split Squat", "category": "Legs"},
+    {"name": "Standing Calf Raise", "category": "Legs"},
+    {"name": "Overhead Barbell Press", "category": "Shoulders"},
+    {"name": "Dumbbell Lateral Raise", "category": "Shoulders"},
+    {"name": "Face Pull", "category": "Shoulders"},
+    {"name": "Dumbbell Arnold Press", "category": "Shoulders"},
+    {"name": "Barbell Bicep Curl", "category": "Arms"},
+    {"name": "Incline Dumbbell Curl", "category": "Arms"},
+    {"name": "Tricep Rope Pushdown", "category": "Arms"},
+    {"name": "Skull Crushers (EZ Bar)", "category": "Arms"},
+    {"name": "Weighted Cable Crunch", "category": "Core"},
+    {"name": "Hanging Leg Raise", "category": "Core"},
+    {"name": "Ab Wheel Rollout", "category": "Core"}
+]
 
-    if not row:
-        return redirect(url_for("history"))
 
-    _, name, age, gender, height, weight, goal, target_weight, activity_level, dietary_preference, allergies, meal_schedule = row
-    
-    # Handle older rows where these might be None
-    dietary_preference = dietary_preference or "Non-Vegetarian"
-    allergies = allergies or "None"
-    meal_schedule = meal_schedule or "Standard (4-5 Meals)"
+@app.route("/dashboard")
+@login_required
+def dashboard():
+    """Personalized fitness & nutrition dashboard for the logged-in user."""
+    user_id = session["user_id"]
+    user = get_user_by_id(user_id)
+
+    if not user.get("weight") or not user.get("goal"):
+        flash("Please complete your body metrics to generate your custom plan.", "info")
+        return redirect(url_for("profile"))
+
+    dietary_preference = user.get("dietary_preference") or "Non-Vegetarian"
+    allergies = user.get("allergies") or "None"
+    meal_schedule = user.get("meal_schedule") or "Standard (4-5 Meals)"
 
     metrics = calculate_user_metrics(
-        age, gender, height, weight, goal, target_weight, activity_level,
-        dietary_preference, allergies, meal_schedule
+        user["age"] or 25,
+        user["gender"] or "Male",
+        user["height"] or 175.0,
+        user["weight"],
+        user["goal"],
+        user["target_weight"] or user["weight"],
+        user["activity_level"] or "Moderate",
+        dietary_preference,
+        allergies,
+        meal_schedule
     )
+
+    top_prs = get_personal_records(user_id=user_id)[:4]
 
     return render_template(
         "dashboard.html",
         user_id=user_id,
-        name=name,
-        age=age,
-        gender=gender,
-        height=height,
-        weight=weight,
-        target_weight=target_weight,
-        goal=goal,
-        activity_level=activity_level,
+        name=user["name"],
+        age=user["age"],
+        gender=user["gender"],
+        height=user["height"],
+        weight=user["weight"],
+        target_weight=user["target_weight"],
+        goal=user["goal"],
+        activity_level=user["activity_level"],
+        top_prs=top_prs,
+        exercises=DEFAULT_EXERCISES,
+        today=datetime.now().strftime("%Y-%m-%d"),
         **metrics
     )
 
 
+@app.route("/dashboard/<int:user_id>")
+@login_required
+def view_dashboard(user_id):
+    """Enforce data isolation: redirect users attempting to access another user's dashboard."""
+    if user_id != session["user_id"]:
+        return redirect(url_for("dashboard"))
+    return dashboard()
+
+
 @app.route("/history")
+@login_required
 def history():
-    """Display all saved profiles from the database."""
-    conn = sqlite3.connect("fitlift.db")
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT id, name, age, gender, height, weight, goal, target_weight, activity_level,
-               dietary_preference, allergies, meal_schedule, created_at
-        FROM users
-        ORDER BY id DESC
-    """)
-    rows = cursor.fetchall()
-    conn.close()
+    """Display logged-in user's profile and assessment snapshot."""
+    user = get_user_by_id(session["user_id"])
+    return render_template("history.html", users=[user] if user else [])
 
-    users = []
-    for r in rows:
-        users.append({
-            "id": r[0],
-            "name": r[1],
-            "age": r[2],
-            "gender": r[3],
-            "height": r[4],
-            "weight": r[5],
-            "goal": r[6],
-            "target_weight": r[7],
-            "activity_level": r[8],
-            "dietary_preference": r[9] or "Non-Vegetarian",
-            "allergies": r[10] or "None",
-            "meal_schedule": r[11] or "Standard (4-5 Meals)",
-            "created_at": str(r[12]) if r[12] else ""
-        })
 
-    return render_template("history.html", users=users)
+# ==============================================================================
+# Progress & Personal Records (PR) Tracker Routes (Strictly Isolated to User)
+# ==============================================================================
+
+@app.route("/progress")
+@login_required
+def progress():
+    user_id = session["user_id"]
+    category = request.args.get("category", default="All")
+
+    stats = get_progress_stats(user_id=user_id)
+    personal_records = get_personal_records(user_id=user_id, category=category)
+    history_list = get_exercise_history(user_id=user_id, category=category, limit=50)
+
+    return render_template(
+        "progress.html",
+        selected_category=category,
+        stats=stats,
+        personal_records=personal_records,
+        history=history_list,
+        exercises=DEFAULT_EXERCISES,
+        today=datetime.now().strftime("%Y-%m-%d")
+    )
+
+@app.route("/progress/add", methods=["POST"])
+@login_required
+def add_progress():
+    user_id = session["user_id"]
+    exercise_name = request.form.get("exercise_name", "").strip()
+    category = request.form.get("category", "Chest").strip()
+    weight = request.form.get("weight_lifted", type=float)
+    reps = request.form.get("reps", type=int)
+    sets = request.form.get("sets", default=1, type=int)
+    notes = request.form.get("notes", "").strip()
+    logged_date = request.form.get("logged_date") or datetime.now().strftime("%Y-%m-%d")
+    redirect_to = request.form.get("redirect_to")
+
+    if exercise_name and weight is not None and reps:
+        new_id, is_new_pr, old_pr_weight = log_exercise_record(
+            user_id, exercise_name, category, weight, reps, sets, notes, logged_date
+        )
+        if is_new_pr:
+            flash(f"🎉 NEW PERSONAL RECORD! {exercise_name}: {weight} kg (Previous best: {old_pr_weight} kg) recorded in your PR Vault!", "success")
+        else:
+            flash(f"✅ Lift logged: {exercise_name} - {weight} kg × {reps} reps recorded in your PR Vault.", "info")
+
+    if redirect_to == "dashboard":
+        return redirect(url_for("dashboard"))
+    return redirect(url_for("progress"))
+
+@app.route("/progress/delete/<int:record_id>", methods=["POST"])
+@login_required
+def delete_progress(record_id):
+    user_id = session["user_id"]
+    delete_exercise_record(record_id, user_id=user_id)
+    flash("Exercise log entry deleted.", "info")
+    return redirect(url_for("progress"))
+
+# ==============================================================================
+# Personal Situational AI Coach Routes (Strictly Scoped to Logged-in User)
+# ==============================================================================
+
+@app.route("/ai-coach")
+@login_required
+def ai_coach():
+    user_id = session["user_id"]
+    user_context = get_user_context(user_id)
+    chat_history = get_chat_history(user_id=user_id, limit=40)
+
+    return render_template(
+        "ai_coach.html",
+        user_context=user_context,
+        chat_history=chat_history
+    )
+
+@app.route("/api/chat", methods=["POST"])
+@login_required
+def api_chat():
+    data = request.get_json() or {}
+    message = data.get("message", "").strip()
+    user_id = session["user_id"]
+    situation_tag = data.get("situation_tag", "general")
+
+    if not message:
+        return jsonify({"error": "Empty message"}), 400
+
+    # Persist user message scoped to logged-in user
+    save_chat_message(user_id, "user", message, situation_tag)
+
+    # Generate response
+    reply = generate_situational_advice(message, user_id=user_id, situation_tag=situation_tag)
+
+    # Persist AI response scoped to logged-in user
+    save_chat_message(user_id, "ai", reply, situation_tag)
+
+    return jsonify({
+        "status": "success",
+        "reply": reply,
+        "situation_tag": situation_tag,
+        "user_id": user_id
+    })
+
+@app.route("/api/chat/history")
+@login_required
+def api_chat_history():
+    user_id = session["user_id"]
+    messages = get_chat_history(user_id=user_id, limit=50)
+    return jsonify({"messages": messages})
+
+@app.route("/api/chat/clear", methods=["POST"])
+@login_required
+def api_chat_clear():
+    user_id = session["user_id"]
+    clear_chat_history(user_id)
+    return jsonify({"status": "cleared"})
+
+@app.route("/api/user-summary/<int:user_id>")
+@login_required
+def api_user_summary(user_id):
+    # Enforce data isolation
+    if user_id != session["user_id"]:
+        return jsonify({"error": "Unauthorized"}), 403
+    ctx = get_user_context(user_id)
+    if not ctx:
+        return jsonify({"error": "User not found"}), 404
+    return jsonify(ctx)
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)

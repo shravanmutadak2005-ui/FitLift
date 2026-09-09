@@ -18,14 +18,29 @@
     <!-- Navbar -->
     <nav class="navbar">
         <div class="nav-container">
-            <a href="{{ url_for('home') }}" class="brand-logo">
+            <a href="{% if current_user %}{{ url_for('dashboard') }}{% else %}{{ url_for('login') }}{% endif %}" class="brand-logo">
                 <i class="fa-solid fa-dumbbell"></i>
                 <span>FitLift</span>
             </a>
             <ul class="nav-links">
-                <li><a href="{{ url_for('home') }}" class="nav-link {% if request.endpoint == 'home' %}active{% endif %}"><i class="fa-solid fa-house"></i> Home</a></li>
-                <li><a href="{{ url_for('history') }}" class="nav-link {% if request.endpoint == 'history' %}active{% endif %}"><i class="fa-solid fa-clock-rotate-left"></i> History</a></li>
-                <li><a href="{{ url_for('profile') }}" class="btn btn-primary" style="padding: 0.5rem 1.1rem; font-size: 0.9rem;"><i class="fa-solid fa-fire"></i> Calculate Plan</a></li>
+                {% if current_user %}
+                <li><a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}"><i class="fa-solid fa-gauge-high"></i> Dashboard</a></li>
+                <li><a href="{{ url_for('progress') }}" class="nav-link {% if request.endpoint == 'progress' %}active{% endif %}"><i class="fa-solid fa-trophy"></i> Progress & PRs</a></li>
+                <li>
+                    <a href="{{ url_for('progress') }}" class="btn btn-primary btn-submit-pr btn-sm" style="padding: 0.35rem 0.85rem; font-size: 0.82rem; text-decoration: none; border-radius: var(--radius-sm);" title="Record new lift to PR Vault">
+                        <i class="fa-solid fa-trophy"></i> + Log PR
+                    </a>
+                </li>
+                <li><a href="{{ url_for('ai_coach') }}" class="nav-link {% if request.endpoint == 'ai_coach' %}active{% endif %}"><i class="fa-solid fa-robot"></i> AI Coach</a></li>
+                <li><a href="{{ url_for('profile') }}" class="nav-link {% if request.endpoint == 'profile' %}active{% endif %}"><i class="fa-solid fa-sliders"></i> Edit Profile</a></li>
+                <li class="user-pill-container">
+                    <span class="user-pill"><i class="fa-solid fa-user-check"></i> {{ current_user.name.split(' ')[0] }}</span>
+                </li>
+                <li><a href="{{ url_for('logout') }}" class="btn-logout" title="Sign Out"><i class="fa-solid fa-right-from-bracket"></i> Logout</a></li>
+                {% else %}
+                <li><a href="{{ url_for('login') }}" class="nav-link {% if request.endpoint == 'login' %}active{% endif %}"><i class="fa-solid fa-right-to-bracket"></i> Sign In</a></li>
+                <li><a href="{{ url_for('register') }}" class="btn btn-primary" style="padding: 0.45rem 1rem; font-size: 0.88rem;"><i class="fa-solid fa-user-plus"></i> Sign Up</a></li>
+                {% endif %}
             </ul>
         </div>
     </nav>
@@ -42,6 +57,177 @@
             <p>Designed with <i class="fa-solid fa-heart footer-heart"></i> for Health & Peak Performance</p>
         </div>
     </footer>
+
+    {% if current_user %}
+    <!-- Global Floating AI Coach Drawer (Accessible for Logged-In Athletes) -->
+    <div id="floatingAiToggle" class="floating-ai-btn" onclick="toggleFloatingDrawer()" title="Ask FitAI Situational Coach">
+        <div class="floating-ai-icon">
+            <i class="fa-solid fa-robot"></i>
+        </div>
+        <span class="floating-ai-label">AI Coach</span>
+        <span class="floating-ai-glow-ring"></span>
+    </div>
+
+    <div id="floatingAiDrawer" class="floating-ai-drawer" style="display: none;">
+        <div class="floating-drawer-header">
+            <div class="drawer-header-title">
+                <div class="drawer-robot-icon"><i class="fa-solid fa-robot"></i></div>
+                <div>
+                    <div style="font-weight: 700; font-size: 0.95rem;">FitAI Situational Advisor</div>
+                    <div style="font-size: 0.75rem; color: var(--accent-green);"><i class="fa-solid fa-circle" style="font-size: 0.5rem;"></i> Active & Ready</div>
+                </div>
+            </div>
+            <div class="drawer-header-actions">
+                <a href="{{ url_for('ai_coach') }}" class="btn-drawer-action" title="Open Full Screen AI Coach">
+                    <i class="fa-solid fa-up-right-from-square"></i>
+                </a>
+                <button type="button" class="btn-drawer-action" onclick="toggleFloatingDrawer()" title="Close Drawer">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Quick situation pills inside drawer -->
+        <div class="drawer-situation-bar">
+            <span class="drawer-situation-chip" onclick="drawerAskSituation('soreness', 'I am feeling sore and tired today. Should I push through or rest?')">🩹 Soreness</span>
+            <span class="drawer-situation-chip" onclick="drawerAskSituation('plateau', 'I hit a plateau on my lifts. How do I break through?')">🧱 Plateau</span>
+            <span class="drawer-situation-chip" onclick="drawerAskSituation('quick_workout', 'I only have 25 minutes today. What workout should I do?')">⏱️ 25m Workout</span>
+            <span class="drawer-situation-chip" onclick="drawerAskSituation('nutrition', 'I fell short on my protein today. What quick snack should I eat?')">🥑 Protein Boost</span>
+            <span class="drawer-situation-chip" onclick="drawerAskSituation('injury_recovery', 'My shoulders hurt when benching. What safe exercises can I do?')">🛡️ Shoulder/Knee Pain</span>
+        </div>
+
+        <div id="drawerMessages" class="drawer-messages-body">
+            <div class="chat-bubble chat-bubble-ai" style="margin-bottom: 0.75rem;">
+                <div class="bubble-avatar"><i class="fa-solid fa-robot"></i></div>
+                <div class="bubble-content" style="font-size: 0.88rem;">
+                    <div class="bubble-title">FitAI Assistant</div>
+                    <p>Hello {{ current_user.name }}! How is your training and body feeling today? Ask me anything about recovery, breaking plateaus, or diet adjustments.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="drawer-input-area">
+            <form id="drawerForm" onsubmit="sendDrawerMessage(event)">
+                <div class="drawer-input-row">
+                    <input type="text" id="drawerInput" class="drawer-input" placeholder="Type your situation or question..." autocomplete="off">
+                    <button type="submit" id="drawerSendBtn" class="drawer-send-btn" title="Send">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Global Floating AI Drawer Scripts -->
+    <script>
+        let isDrawerOpen = false;
+
+        function toggleFloatingDrawer() {
+            isDrawerOpen = !isDrawerOpen;
+            const drawer = document.getElementById('floatingAiDrawer');
+            const toggleBtn = document.getElementById('floatingAiToggle');
+            if (drawer) {
+                drawer.style.display = isDrawerOpen ? 'flex' : 'none';
+                if (isDrawerOpen) {
+                    document.getElementById('drawerInput').focus();
+                    scrollDrawerToBottom();
+                }
+            }
+        }
+
+        function scrollDrawerToBottom() {
+            const el = document.getElementById('drawerMessages');
+            if (el) el.scrollTop = el.scrollHeight;
+        }
+
+        function drawerAskSituation(tag, promptText) {
+            document.getElementById('drawerInput').value = promptText;
+            document.getElementById('drawerForm').dispatchEvent(new Event('submit'));
+        }
+
+        async function sendDrawerMessage(e) {
+            e.preventDefault();
+            const input = document.getElementById('drawerInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            const container = document.getElementById('drawerMessages');
+            const sendBtn = document.getElementById('drawerSendBtn');
+
+            // Append user bubble
+            const uBubble = document.createElement('div');
+            uBubble.className = 'chat-bubble chat-bubble-user';
+            uBubble.style.marginBottom = '0.75rem';
+            uBubble.innerHTML = `
+                <div class="bubble-avatar"><i class="fa-solid fa-user"></i></div>
+                <div class="bubble-content" style="font-size: 0.88rem;">
+                    <div class="bubble-title">You</div>
+                    <div>${text}</div>
+                </div>
+            `;
+            container.appendChild(uBubble);
+            input.value = '';
+            scrollDrawerToBottom();
+
+            // Typing bubble
+            const tBubble = document.createElement('div');
+            tBubble.className = 'chat-bubble chat-bubble-ai';
+            tBubble.id = 'drawerTyping';
+            tBubble.style.marginBottom = '0.75rem';
+            tBubble.innerHTML = `
+                <div class="bubble-avatar"><i class="fa-solid fa-robot"></i></div>
+                <div class="bubble-content" style="font-size: 0.85rem; color: var(--text-secondary);">
+                    <i class="fa-solid fa-circle-notch fa-spin"></i> Analyzing your situation...
+                </div>
+            `;
+            container.appendChild(tBubble);
+            scrollDrawerToBottom();
+
+            sendBtn.disabled = true;
+
+            try {
+                const res = await fetch("{{ url_for('api_chat') }}", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ message: text, situation_tag: "general" })
+                });
+                const data = await res.json();
+                
+                // Remove typing bubble
+                const typingEl = document.getElementById('drawerTyping');
+                if (typingEl) typingEl.remove();
+
+                // Format simple markdown
+                const replyHtml = data.reply
+                    .replace(/^### (.*$)/gim, '<h5 style="color:var(--primary);margin:0.25rem 0;">$1</h5>')
+                    .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
+                    .replace(/^\s*[-•]\s+(.*$)/gim, '<li style="margin-left:1rem;">$1</li>')
+                    .replace(/\n\n/g, '<br><br>')
+                    .replace(/\n/g, '<br>');
+
+                const aiBubble = document.createElement('div');
+                aiBubble.className = 'chat-bubble chat-bubble-ai';
+                aiBubble.style.marginBottom = '0.75rem';
+                aiBubble.innerHTML = `
+                    <div class="bubble-avatar"><i class="fa-solid fa-robot"></i></div>
+                    <div class="bubble-content" style="font-size: 0.88rem;">
+                        <div class="bubble-title">FitAI Assistant</div>
+                        <div>${replyHtml}</div>
+                    </div>
+                `;
+                container.appendChild(aiBubble);
+                scrollDrawerToBottom();
+            } catch (err) {
+                console.error(err);
+                const typingEl = document.getElementById('drawerTyping');
+                if (typingEl) typingEl.remove();
+            } finally {
+                sendBtn.disabled = false;
+                input.focus();
+            }
+        }
+    </script>
 
     {% block scripts %}{% endblock %}
 </body>

@@ -1,37 +1,30 @@
 {% extends "base.html" %}
 
-{% block title %}Create Your Profile - FitLift{% endblock %}
+{% block title %}Body Metrics & Preferences - FitLift{% endblock %}
 
 {% block content %}
 <div class="form-container">
     <div class="card">
         <div class="card-header">
             <span class="badge badge-primary" style="margin-bottom: 0.75rem;">
-                <i class="fa-solid fa-sliders"></i> Body Metrics & Nutrition Preferences
+                <i class="fa-solid fa-sliders"></i> Personal Metabolic Profile
             </span>
-            <h1 class="card-title">Create Your FitLift Profile</h1>
-            <p class="card-subtitle">Enter your measurements, fitness goal, and dietary requirements to calculate your personalized plan.</p>
+            <h1 class="card-title">Fitness Profile for <span class="gradient-text">{{ current_user.name }}</span></h1>
+            <p class="card-subtitle">
+                Logged in as <strong>@{{ current_user.username }}</strong>. Enter or update your body metrics and nutrition preferences to calculate your custom plan.
+            </p>
         </div>
 
         <form method="POST" action="{{ url_for('profile') }}">
             <div class="form-grid">
-                <!-- Name -->
-                <div class="form-group form-group-full">
-                    <label class="form-label" for="name">
-                        <i class="fa-solid fa-user"></i> Full Name
-                    </label>
-                    <div class="input-wrapper">
-                        <input type="text" id="name" name="name" class="form-input" placeholder="e.g. Alex Johnson" required autofocus>
-                    </div>
-                </div>
-
                 <!-- Age -->
                 <div class="form-group">
                     <label class="form-label" for="age">
                         <i class="fa-solid fa-cake-candles"></i> Age
                     </label>
                     <div class="input-wrapper input-with-unit">
-                        <input type="number" id="age" name="age" class="form-input" min="10" max="120" placeholder="e.g. 25" required>
+                        <input type="number" id="age" name="age" class="form-input" min="10" max="120" 
+                               value="{{ user.age if user and user.age else '25' }}" placeholder="e.g. 25" required>
                         <span class="unit-tag">years</span>
                     </div>
                 </div>
@@ -43,8 +36,8 @@
                     </label>
                     <div class="input-wrapper">
                         <select id="gender" name="gender" class="form-select" required>
-                            <option value="Male">Male</option>
-                            <option value="Female">Female</option>
+                            <option value="Male" {% if user and user.gender == 'Male' %}selected{% endif %}>Male</option>
+                            <option value="Female" {% if user and user.gender == 'Female' %}selected{% endif %}>Female</option>
                         </select>
                     </div>
                 </div>
@@ -55,7 +48,8 @@
                         <i class="fa-solid fa-ruler-vertical"></i> Height
                     </label>
                     <div class="input-wrapper input-with-unit">
-                        <input type="number" step="0.1" id="height" name="height" class="form-input" min="50" max="250" placeholder="e.g. 175" required>
+                        <input type="number" step="0.1" id="height" name="height" class="form-input" min="50" max="250" 
+                               value="{{ user.height if user and user.height else '175.0' }}" placeholder="e.g. 175" required>
                         <span class="unit-tag">cm</span>
                     </div>
                 </div>
@@ -66,7 +60,8 @@
                         <i class="fa-solid fa-weight-scale"></i> Current Weight
                     </label>
                     <div class="input-wrapper input-with-unit">
-                        <input type="number" step="0.1" id="weight" name="weight" class="form-input" min="20" max="300" placeholder="e.g. 75" required>
+                        <input type="number" step="0.1" id="weight" name="weight" class="form-input" min="20" max="300" 
+                               value="{{ user.weight if user and user.weight else '70.0' }}" placeholder="e.g. 75" required>
                         <span class="unit-tag">kg</span>
                     </div>
                 </div>
@@ -78,10 +73,10 @@
                     </label>
                     <div class="input-wrapper">
                         <select id="goal" name="goal" class="form-select" required>
-                            <option value="Muscle Gain">💪 Muscle Gain (Surplus)</option>
-                            <option value="Weight Loss">🥗 Weight Loss (Deficit)</option>
-                            <option value="Strength Gain">🏋️ Strength Gain</option>
-                            <option value="Weight Maintenance">⚖️ Weight Maintenance</option>
+                            <option value="Muscle Gain" {% if user and user.goal == 'Muscle Gain' %}selected{% endif %}>💪 Muscle Gain (Surplus)</option>
+                            <option value="Weight Loss" {% if user and user.goal == 'Weight Loss' %}selected{% endif %}>🥗 Weight Loss (Deficit)</option>
+                            <option value="Strength Gain" {% if user and user.goal == 'Strength Gain' %}selected{% endif %}>🏋️ Strength Gain</option>
+                            <option value="Weight Maintenance" {% if user and user.goal == 'Weight Maintenance' %}selected{% endif %}>⚖️ Weight Maintenance</option>
                         </select>
                     </div>
                 </div>
@@ -92,7 +87,8 @@
                         <i class="fa-solid fa-flag-checkered"></i> Target Weight
                     </label>
                     <div class="input-wrapper input-with-unit">
-                        <input type="number" step="0.1" id="target_weight" name="target_weight" class="form-input" min="20" max="300" placeholder="e.g. 80" required>
+                        <input type="number" step="0.1" id="target_weight" name="target_weight" class="form-input" min="20" max="300" 
+                               value="{{ user.target_weight if user and user.target_weight else '75.0' }}" placeholder="e.g. 80" required>
                         <span class="unit-tag">kg</span>
                     </div>
                 </div>
@@ -104,9 +100,9 @@
                     </label>
                     <div class="input-wrapper">
                         <select id="activity_level" name="activity_level" class="form-select" required>
-                            <option value="Low">Sedentary (Little or no exercise)</option>
-                            <option value="Moderate" selected>Moderate (Exercise 3-5 days/week)</option>
-                            <option value="High">Active (Heavy exercise 6-7 days/week)</option>
+                            <option value="Low" {% if user and user.activity_level == 'Low' %}selected{% endif %}>Sedentary (Little or no exercise)</option>
+                            <option value="Moderate" {% if not user or user.activity_level == 'Moderate' %}selected{% endif %}>Moderate (Exercise 3-5 days/week)</option>
+                            <option value="High" {% if user and user.activity_level == 'High' %}selected{% endif %}>Active (Heavy exercise 6-7 days/week)</option>
                         </select>
                     </div>
                 </div>
@@ -118,11 +114,11 @@
                     </label>
                     <div class="input-wrapper">
                         <select id="dietary_preference" name="dietary_preference" class="form-select" required>
-                            <option value="Non-Vegetarian">🍗 Non-Vegetarian (Chicken, Eggs, Meat)</option>
-                            <option value="Vegetarian">🌱 Vegetarian (Paneer, Dairy, Lentils)</option>
-                            <option value="Eggetarian">🍳 Eggetarian (Eggs, Dairy & Veg)</option>
-                            <option value="Vegan">🌿 Vegan (100% Plant-Based)</option>
-                            <option value="Keto">🥑 Keto / Low-Carb (High Healthy Fats)</option>
+                            <option value="Non-Vegetarian" {% if not user or user.dietary_preference == 'Non-Vegetarian' %}selected{% endif %}>🍗 Non-Vegetarian (Chicken, Eggs, Meat)</option>
+                            <option value="Vegetarian" {% if user and user.dietary_preference == 'Vegetarian' %}selected{% endif %}>🌱 Vegetarian (Paneer, Dairy, Lentils)</option>
+                            <option value="Eggetarian" {% if user and user.dietary_preference == 'Eggetarian' %}selected{% endif %}>🍳 Eggetarian (Eggs, Dairy & Veg)</option>
+                            <option value="Vegan" {% if user and user.dietary_preference == 'Vegan' %}selected{% endif %}>🌿 Vegan (100% Plant-Based)</option>
+                            <option value="Keto" {% if user and user.dietary_preference == 'Keto' %}selected{% endif %}>🥑 Keto / Low-Carb (High Healthy Fats)</option>
                         </select>
                     </div>
                 </div>
@@ -134,11 +130,11 @@
                     </label>
                     <div class="input-wrapper">
                         <select id="allergies" name="allergies" class="form-select">
-                            <option value="None">None (No Food Restrictions)</option>
-                            <option value="Dairy-Free">🥛 Dairy-Free (Lactose-Free)</option>
-                            <option value="Nut-Free">🥜 Nut-Free (No Peanuts/Tree Nuts)</option>
-                            <option value="Gluten-Free">🌾 Gluten-Free (No Wheat/Gluten)</option>
-                            <option value="Dairy-Free & Gluten-Free">🥛🌾 Dairy & Gluten-Free</option>
+                            <option value="None" {% if not user or user.allergies == 'None' %}selected{% endif %}>None (No Food Restrictions)</option>
+                            <option value="Dairy-Free" {% if user and user.allergies == 'Dairy-Free' %}selected{% endif %}>🥛 Dairy-Free (Lactose-Free)</option>
+                            <option value="Nut-Free" {% if user and user.allergies == 'Nut-Free' %}selected{% endif %}>🥜 Nut-Free (No Peanuts/Tree Nuts)</option>
+                            <option value="Gluten-Free" {% if user and user.allergies == 'Gluten-Free' %}selected{% endif %}>🌾 Gluten-Free (No Wheat/Gluten)</option>
+                            <option value="Dairy-Free & Gluten-Free" {% if user and user.allergies == 'Dairy-Free & Gluten-Free' %}selected{% endif %}>🥛🌾 Dairy & Gluten-Free</option>
                         </select>
                     </div>
                 </div>
@@ -150,16 +146,16 @@
                     </label>
                     <div class="input-wrapper">
                         <select id="meal_schedule" name="meal_schedule" class="form-select" required>
-                            <option value="Standard (4-5 Meals)">Standard Structure (Breakfast, Lunch, Pre/Post Workout, Dinner)</option>
-                            <option value="Intermittent Fasting (16/8 Window)">Intermittent Fasting (16-Hour Fast / 8-Hour Feeding Window)</option>
-                            <option value="3 Meals Only">3 Main Meals Only (Breakfast, Lunch, Dinner)</option>
+                            <option value="Standard (4-5 Meals)" {% if not user or user.meal_schedule == 'Standard (4-5 Meals)' %}selected{% endif %}>Standard Structure (Breakfast, Lunch, Pre/Post Workout, Dinner)</option>
+                            <option value="Intermittent Fasting (16/8 Window)" {% if user and user.meal_schedule == 'Intermittent Fasting (16/8 Window)' %}selected{% endif %}>Intermittent Fasting (16-Hour Fast / 8-Hour Feeding Window)</option>
+                            <option value="3 Meals Only" {% if user and user.meal_schedule == '3 Meals Only' %}selected{% endif %}>3 Main Meals Only (Breakfast, Lunch, Dinner)</option>
                         </select>
                     </div>
                 </div>
             </div>
 
             <button type="submit" class="btn btn-primary submit-btn">
-                <i class="fa-solid fa-wand-magic-sparkles"></i> Generate My Custom Plan
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Save Metrics & Generate Plan
             </button>
         </form>
     </div>
